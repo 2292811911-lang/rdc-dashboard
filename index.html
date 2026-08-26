@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>广州白云RDC · 分拣太空座舱看板</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
 body { font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif; background: #f5f7fa; color: #333; min-height: 100vh; padding: 16px; min-width: 1400px; }
@@ -103,7 +104,7 @@ tr.avg-row td { color: #1a5fb4; font-weight: 700; font-size: 12px; }
 <div class="dashboard">
     <div class="header">
         <h1>广州白云RDC · 分拣太空座舱看板</h1>
-        <div class="subtitle">松鼠便利共享中心仓 | 2026-08-26 14:38:53 | 实时数据 | 按单拣货</div>
+        <div class="subtitle">松鼠便利共享中心仓 | 2026-08-26 15:15:51 | 实时数据 | 按单拣货</div>
     </div>
 
     <div class="progress-panel">
@@ -847,8 +848,90 @@ tr.avg-row td { color: #1a5fb4; font-weight: 700; font-size: 12px; }
         </div></div></div>
     </div>
 
-    <div class="footer">RDC PICKING COCKPIT · 广州白云仓 · 松鼠便利共享中心仓 · 2026-08-26 14:38:53</div>
+    <div class="panel">
+        <div class="panel-title">
+            <div class="dot"></div>
+            <h2>员工历史趋势（近10天）</h2>
+            <span class="badge">后3天 vs 前3天对比</span>
+        </div>
+        <div class="chart-box" style="height:320px">
+            <canvas id="trendChart"></canvas>
+        </div>
+        <div style="margin-top:12px;font-size:12px;color:#666">
+            <b style="color:#1a5fb4">时效趋势表</b>（前3天日均 vs 后3天日均）
+        </div>
+        <div class="table-wrap" style="margin-top:6px">
+            <table>
+                <thead><tr><th>员工</th><th>前3天日均</th><th>后3天日均</th><th>变化幅度</th><th>趋势</th></tr></thead>
+                <tbody id="trendTableBody">
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="footer">RDC PICKING COCKPIT · 广州白云仓 · 松鼠便利共享中心仓 · 2026-08-26 15:15:51</div>
 </div>
+
+<script>
+// 历史数据
+const HISTORY_DATA = {"邓健滔": {"dates": ["2026-08-15", "2026-08-16", "2026-08-17", "2026-08-19", "2026-08-20", "2026-08-21", "2026-08-22", "2026-08-24", "2026-08-25", "2026-08-26"], "packing_done": [1441, 1768, 2035, 1759, 2498, 1397, 1612, 2013, 1986, 1368], "basic_done": [2093, 2473, 2968, 2510, 5364, 4366, 2773, 3003, 2879, 1720], "task_count": [9, 12, 10, 11, 12, 11, 12, 12, 11, 6]}, "何春福": {"dates": ["2026-08-02", "2026-08-03", "2026-08-04", "2026-08-06", "2026-08-07", "2026-08-08", "2026-08-09", "2026-08-10", "2026-08-12", "2026-08-13"], "packing_done": [1917, 1416, 2099, 1692, 1435, 1349, 1460, 1933, 1560, 1284], "basic_done": [2709, 1856, 2695, 4063, 1889, 1925, 1745, 2613, 2160, 1879], "task_count": [11, 8, 8, 8, 8, 9, 10, 9, 7, 12]}, "雷富淇": {"dates": ["2026-08-02"], "packing_done": [395], "basic_done": [463], "task_count": [3]}, "张永年": {"dates": ["2026-08-15", "2026-08-16", "2026-08-17", "2026-08-18", "2026-08-20", "2026-08-21", "2026-08-22", "2026-08-23", "2026-08-25", "2026-08-26"], "packing_done": [1576, 2161, 2070, 2135, 2934, 1821, 1597, 2145, 1960, 1398], "basic_done": [2144, 2742, 2728, 2662, 4437, 2620, 2379, 2809, 2953, 1790], "task_count": [7, 10, 8, 11, 10, 10, 11, 15, 12, 7]}, "林伟君": {"dates": ["2026-08-16", "2026-08-17", "2026-08-18", "2026-08-19", "2026-08-20", "2026-08-21", "2026-08-23", "2026-08-24", "2026-08-25", "2026-08-26"], "packing_done": [2100, 2414, 2025, 1660, 3335, 1819, 2405, 2464, 2408, 1671], "basic_done": [2631, 3388, 3013, 2256, 4470, 2522, 3232, 3257, 3731, 2328], "task_count": [11, 12, 13, 11, 11, 12, 15, 13, 13, 7]}, "农腾": {"dates": ["2026-08-02", "2026-08-03", "2026-08-04", "2026-08-06", "2026-08-07", "2026-08-08", "2026-08-09", "2026-08-10", "2026-08-11", "2026-08-13"], "packing_done": [1824, 1438, 1278, 1608, 1551, 1691, 1857, 1923, 1956, 1206], "basic_done": [2392, 2043, 1883, 2143, 1863, 2284, 2417, 2259, 2501, 1706], "task_count": [12, 8, 11, 9, 11, 9, 12, 8, 12, 10]}, "黄云语": {"dates": ["2026-08-07", "2026-08-08", "2026-08-12", "2026-08-13", "2026-08-18", "2026-08-19", "2026-08-20", "2026-08-21", "2026-08-22", "2026-08-23"], "packing_done": [1928, 1813, 1601, 352, 2218, 1717, 2876, 2084, 1857, 2087], "basic_done": [2746, 2073, 2098, 447, 2961, 2106, 4170, 2848, 2723, 2550], "task_count": [15, 11, 13, 1, 14, 12, 15, 13, 13, 11]}, "黎朝语": {"dates": ["2026-08-14", "2026-08-15", "2026-08-16", "2026-08-18", "2026-08-20", "2026-08-21", "2026-08-22", "2026-08-23", "2026-08-24", "2026-08-25"], "packing_done": [1981, 1706, 2246, 649, 3103, 2201, 1838, 2173, 2402, 2498], "basic_done": [2670, 2308, 2539, 919, 4406, 3149, 2497, 2698, 2952, 3398], "task_count": [13, 10, 11, 6, 13, 12, 11, 15, 12, 15]}, "杨凯杰": {"dates": ["2026-08-20"], "packing_done": [478], "basic_done": [603], "task_count": [6]}, "王进亭": {"dates": ["2026-08-16", "2026-08-17", "2026-08-18", "2026-08-20", "2026-08-21", "2026-08-22", "2026-08-23", "2026-08-24", "2026-08-25", "2026-08-26"], "packing_done": [2267, 2294, 1761, 3110, 1444, 1535, 1884, 2371, 1934, 1468], "basic_done": [2843, 2939, 7091, 4890, 2379, 1932, 2435, 3550, 2591, 1839], "task_count": [11, 10, 13, 12, 9, 7, 14, 12, 13, 7]}, "陈旭": {"dates": ["2026-08-04"], "packing_done": [93], "basic_done": [136], "task_count": [1]}, "杨明涛": {"dates": ["2026-08-05"], "packing_done": [265], "basic_done": [283], "task_count": [3]}, "陆家乐": {"dates": ["2026-08-02", "2026-08-03", "2026-08-04", "2026-08-06", "2026-08-07", "2026-08-08", "2026-08-09", "2026-08-10", "2026-08-11", "2026-08-13"], "packing_done": [2148, 1531, 1631, 1612, 1498, 1521, 1976, 1890, 1936, 1446], "basic_done": [2629, 2171, 4138, 2281, 2033, 1937, 2796, 2493, 2589, 1990], "task_count": [13, 10, 11, 11, 9, 11, 11, 11, 12, 12]}, "周欣琪": {"dates": ["2026-08-20"], "packing_done": [428], "basic_done": [650], "task_count": [6]}, "方忠浪": {"dates": ["2026-08-02", "2026-08-20"], "packing_done": [268, 63], "basic_done": [354, 67], "task_count": [3, 2]}, "黄左谟": {"dates": ["2026-08-15", "2026-08-17", "2026-08-18", "2026-08-19", "2026-08-20", "2026-08-21", "2026-08-23", "2026-08-24", "2026-08-25", "2026-08-26"], "packing_done": [1656, 2352, 2282, 1692, 2708, 1732, 2137, 2567, 2095, 1521], "basic_done": [2628, 3040, 2908, 2311, 3419, 2582, 2921, 3244, 2522, 1924], "task_count": [10, 10, 10, 12, 9, 9, 13, 14, 10, 7]}, "黄秀芹": {"dates": ["2026-08-15", "2026-08-16", "2026-08-18", "2026-08-19", "2026-08-20", "2026-08-21", "2026-08-22", "2026-08-24", "2026-08-25", "2026-08-26"], "packing_done": [1662, 2203, 2205, 1655, 2758, 1979, 1788, 2461, 2006, 1584], "basic_done": [2519, 2834, 2612, 2519, 4360, 2895, 2799, 5376, 2932, 2251], "task_count": [11, 10, 10, 11, 13, 12, 11, 13, 12, 8]}, "陈德云": {"dates": ["2026-08-15", "2026-08-16", "2026-08-17", "2026-08-19", "2026-08-20", "2026-08-21", "2026-08-22", "2026-08-24", "2026-08-25", "2026-08-26"], "packing_done": [1744, 2336, 2255, 1840, 2945, 1930, 1682, 2135, 2231, 1485], "basic_done": [2173, 2944, 3074, 2630, 3764, 2668, 2083, 3014, 2882, 1826], "task_count": [13, 12, 12, 14, 12, 10, 11, 12, 12, 7]}, "黄正兴": {"dates": ["2026-08-08", "2026-08-10", "2026-08-11", "2026-08-12", "2026-08-13", "2026-08-14", "2026-08-16", "2026-08-19", "2026-08-23", "2026-08-24"], "packing_done": [3, 11, 1, 214, 4, 5, 245, 52, 3, 6], "basic_done": [3, 20, 1, 354, 4, 5, 287, 52, 3, 6], "task_count": [1, 5, 1, 7, 3, 2, 1, 9, 2, 4]}, "廖雄辉": {"dates": ["2026-08-09", "2026-08-11", "2026-08-12", "2026-08-13", "2026-08-14", "2026-08-15", "2026-08-17", "2026-08-18", "2026-08-19", "2026-08-20"], "packing_done": [1977, 2334, 1776, 482, 1733, 1505, 2511, 2168, 1642, 288], "basic_done": [2816, 3231, 2377, 724, 2306, 2080, 3345, 3016, 2171, 509], "task_count": [15, 13, 9, 1, 13, 10, 13, 13, 12, 3]}, "陈军瑾": {"dates": ["2026-08-02", "2026-08-11", "2026-08-12", "2026-08-13", "2026-08-14", "2026-08-20"], "packing_done": [1922, 937, 824, 514, 1130, 237], "basic_done": [2556, 1333, 1167, 812, 1938, 344], "task_count": [9, 16, 10, 5, 12, 4]}, "曾俊桦": {"dates": ["2026-08-13", "2026-08-16", "2026-08-17", "2026-08-18", "2026-08-19", "2026-08-21", "2026-08-22", "2026-08-23", "2026-08-24", "2026-08-25"], "packing_done": [1886, 2142, 2071, 1811, 1830, 1850, 1580, 2134, 1929, 2169], "basic_done": [2677, 2530, 2856, 4299, 2345, 2346, 2080, 2794, 2480, 3050], "task_count": [14, 11, 11, 10, 13, 8, 13, 13, 12, 11]}, "陈涛": {"dates": ["2026-08-16", "2026-08-17", "2026-08-18", "2026-08-19", "2026-08-21"], "packing_done": [1491, 1637, 1335, 1154, 1410], "basic_done": [2108, 2369, 1878, 1707, 2116], "task_count": [13, 14, 13, 12, 7]}, "邓小槐": {"dates": ["2026-08-02", "2026-08-03", "2026-08-12", "2026-08-19", "2026-08-20", "2026-08-26"], "packing_done": [390, 26, 395, 28, 4, 113], "basic_done": [513, 59, 500, 113, 4, 122], "task_count": [10, 5, 8, 7, 3, 4]}, "黄振彬": {"dates": ["2026-08-15", "2026-08-17", "2026-08-18", "2026-08-19", "2026-08-20", "2026-08-22", "2026-08-23", "2026-08-24", "2026-08-25", "2026-08-26"], "packing_done": [898, 1566, 1491, 1615, 3202, 1755, 2241, 2065, 1995, 1399], "basic_done": [1063, 2314, 1994, 2395, 3951, 2461, 2949, 2696, 2745, 1709], "task_count": [17, 16, 12, 13, 12, 12, 14, 13, 10, 7]}, "詹丽蓉": {"dates": ["2026-08-05", "2026-08-08", "2026-08-09", "2026-08-10"], "packing_done": [476, 522, 647, 665], "basic_done": [607, 695, 806, 1032], "task_count": [7, 10, 8, 11]}, "范经纬": {"dates": ["2026-08-03"], "packing_done": [93], "basic_done": [116], "task_count": [1]}};
+const TREND_DATA = {"邓健滔": {"first_3_avg": 1748.0, "last_3_avg": 1789.0, "change_pct": 2.3}, "何春福": {"first_3_avg": 1810.7, "last_3_avg": 1592.3, "change_pct": -12.1}, "张永年": {"first_3_avg": 1935.7, "last_3_avg": 1834.3, "change_pct": -5.2}, "林伟君": {"first_3_avg": 2179.7, "last_3_avg": 2181.0, "change_pct": 0.1}, "农腾": {"first_3_avg": 1513.3, "last_3_avg": 1695.0, "change_pct": 12.0}, "黄云语": {"first_3_avg": 1780.7, "last_3_avg": 2009.3, "change_pct": 12.8}, "黎朝语": {"first_3_avg": 1977.7, "last_3_avg": 2357.7, "change_pct": 19.2}, "王进亭": {"first_3_avg": 2107.3, "last_3_avg": 1924.3, "change_pct": -8.7}, "陆家乐": {"first_3_avg": 1770.0, "last_3_avg": 1757.3, "change_pct": -0.7}, "黄左谟": {"first_3_avg": 2096.7, "last_3_avg": 2061.0, "change_pct": -1.7}, "黄秀芹": {"first_3_avg": 2023.3, "last_3_avg": 2017.0, "change_pct": -0.3}, "陈德云": {"first_3_avg": 2111.7, "last_3_avg": 1950.3, "change_pct": -7.6}, "黄正兴": {"first_3_avg": 5.0, "last_3_avg": 20.3, "change_pct": 306.7}, "廖雄辉": {"first_3_avg": 2029.0, "last_3_avg": 1366.0, "change_pct": -32.7}, "陈军瑾": {"first_3_avg": 1227.7, "last_3_avg": 627.0, "change_pct": -48.9}, "曾俊桦": {"first_3_avg": 2033.0, "last_3_avg": 2077.3, "change_pct": 2.2}, "邓小槐": {"first_3_avg": 270.3, "last_3_avg": 48.3, "change_pct": -82.1}, "黄振彬": {"first_3_avg": 1318.3, "last_3_avg": 1819.7, "change_pct": 38.0}};
+
+// 渲染趋势图
+(function() {
+    const empNames = Object.keys(HISTORY_DATA);
+    if (empNames.length === 0) return;
+    const labels = HISTORY_DATA[empNames[0]].dates;
+    const colors = ['#3584e4','#e67e22','#27ae60','#e74c3c','#9b59b6','#1abc9c','#f39c12','#34495e','#e91e63','#00bcd4','#ff5722','#795548','#607d8b','#8bc34a','#ffc107'];
+    const datasets = empNames.slice(0, 10).map(function(name, i) {
+        return {
+            label: name,
+            data: HISTORY_DATA[name].packing_done,
+            borderColor: colors[i % colors.length],
+            backgroundColor: colors[i % colors.length] + '20',
+            borderWidth: 2,
+            pointRadius: 3,
+            tension: 0.3,
+            fill: false
+        };
+    });
+    var canvas = document.getElementById('trendChart');
+    if (canvas) {
+        var ctx = canvas.getContext('2d');
+        new Chart(ctx, {
+            type: 'line',
+            data: { labels: labels, datasets: datasets },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { position: 'bottom', labels: { font: { size: 10 }, boxWidth: 12 } },
+                    title: { display: false }
+                },
+                scales: {
+                    y: { beginAtZero: true, title: { display: true, text: '包装单位件数' }, ticks: { font: { size: 10 } } },
+                    x: { ticks: { font: { size: 10 } } }
+                }
+            }
+        });
+    }
+
+    // 渲染趋势表
+    var tbody = document.getElementById('trendTableBody');
+    var sorted = Object.entries(TREND_DATA).sort(function(a, b) { return b[1].change_pct - a[1].change_pct; });
+    sorted.forEach(function(item) {
+        var name = item[0];
+        var td = item[1];
+        var arrow = td.change_pct > 0 ? '↗' : (td.change_pct < 0 ? '↘' : '→');
+        var color = td.change_pct > 5 ? '#2e7d32' : (td.change_pct < -5 ? '#c62828' : '#666');
+        var trendText = td.change_pct > 5 ? '上升' : (td.change_pct < -5 ? '下降' : '持平');
+        tbody.innerHTML += '<tr><td style="font-weight:600;color:#1a5fb4">' + name + '</td><td>' + td.first_3_avg.toLocaleString() + '</td><td>' + td.last_3_avg.toLocaleString() + '</td><td style="font-weight:700;color:' + color + '">' + (td.change_pct > 0 ? '+' : '') + td.change_pct + '% ' + arrow + '</td><td style="color:' + color + '">' + trendText + '</td></tr>';
+    });
+    if (sorted.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:#999;padding:12px">暂无历史数据</td></tr>';
+    }
+})();
+</script>
 
 </body>
 </html>
