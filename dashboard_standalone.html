@@ -56272,6 +56272,9 @@ function renderStoreProgress() {
   stores.forEach(s => statusCounts[s.status]++);
   
   // 状态汇总条
+  const noStoreCount = (todayStoreStats['未知门店'] || {}).task_count || 0;
+  const noStoreDone = (todayStoreStats['未知门店'] || {}).done || 0;
+  
   container.innerHTML += `
     <div class="flex gap-3 mb-5 flex-wrap">
       <div class="px-3 py-1.5 rounded-lg bg-emerald-900/50 border border-emerald-700 text-sm">
@@ -56287,6 +56290,9 @@ function renderStoreProgress() {
         <span class="text-blue-400 font-bold">${stores.length}</span> <span class="text-gray-400">门店总数</span>
       </div>
     </div>
+    ${noStoreCount > 0 ? `<div class="mb-4 px-3 py-2 rounded bg-amber-900/30 border border-amber-700 text-sm text-amber-300">
+      <i class="fas fa-exclamation-triangle mr-1"></i>注意：今天有 <b>${noStoreCount}</b> 条任务（实拣量 ${noStoreDone.toLocaleString()} 件）未绑定门店，未计入门店进度
+    </div>` : ''}
   `;
   
   // 按波次分组
