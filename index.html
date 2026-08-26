@@ -1,0 +1,854 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>广州白云RDC · 分拣太空座舱看板</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif; background: #f5f7fa; color: #333; min-height: 100vh; padding: 16px; min-width: 1400px; }
+.dashboard { max-width: 1600px; margin: 0 auto; }
+.header { text-align: center; padding: 16px 0 12px; }
+.header h1 { font-size: 24px; font-weight: 700; color: #1a5fb4; }
+.header .subtitle { font-size: 13px; color: #777; margin-top: 4px; }
+.panel { background: #fff; border-radius: 10px; padding: 14px; margin-bottom: 12px; box-shadow: 0 1px 6px rgba(0,0,0,0.06); }
+.panel-title { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid #e8ecf1; }
+.panel-title .dot { width: 6px; height: 6px; background: #1a5fb4; border-radius: 50%; }
+.panel-title h2 { font-size: 15px; color: #1a5fb4; font-weight: 600; }
+.panel-title .badge { margin-left: auto; background: #eef4fc; padding: 2px 10px; border-radius: 12px; font-size: 11px; color: #1a5fb4; }
+.stats-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; margin-bottom: 14px; }
+.stat-card { background: #f8fafc; border: 1px solid #e8ecf1; border-radius: 8px; padding: 12px; text-align: center; }
+.stat-card .label { font-size: 11px; color: #888; margin-bottom: 4px; }
+.stat-card .value { font-size: 22px; font-weight: 700; color: #1a5fb4; }
+.stat-card .unit { font-size: 11px; color: #aaa; margin-top: 2px; }
+.stat-card.green .value { color: #2e7d32; }
+.progress-panel { background: #fff; border-radius: 10px; padding: 14px 18px; margin-bottom: 14px; box-shadow: 0 1px 6px rgba(0,0,0,0.06); }
+.progress-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+.progress-title { font-size: 15px; font-weight: 600; color: #333; }
+.progress-numbers { font-size: 12px; color: #666; }
+.progress-numbers b { color: #1a5fb4; font-size: 14px; }
+.progress-bar-bg { position: relative; height: 24px; background: #e8ecf1; border-radius: 12px; overflow: hidden; }
+.progress-bar-fill { height: 100%; background: linear-gradient(90deg, #3584e4, #1a5fb4); border-radius: 12px; transition: width 0.5s ease; }
+.progress-bar-text { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 13px; font-weight: 700; color: #fff; }
+.chart-box { background: #fafbfc; border: 1px solid #e8ecf1; border-radius: 8px; padding: 8px; margin-bottom: 8px; height: 260px; position: relative; }
+.chart-box canvas { max-height: 240px; }
+.table-wrap { overflow-x: auto; border-radius: 6px; border: 1px solid #e8ecf1; }
+table { width: 100%; border-collapse: collapse; font-size: 12px; }
+thead tr { background: #eef4fc; }
+th { padding: 6px 6px; text-align: center; color: #1a5fb4; font-weight: 600; border-bottom: 1px solid #d0e0f0; white-space: nowrap; font-size: 11px; }
+th:first-child { text-align: left; padding-left: 10px; }
+td { padding: 4px 6px; text-align: center; border-bottom: 1px solid #f0f2f5; color: #444; font-size: 11px; }
+td:first-child { text-align: left; padding-left: 10px; font-weight: 600; color: #1a5fb4; }
+tbody tr:hover { background: #f8fafc; }
+tbody tr:nth-child(even) { background: #fafbfc; }
+tr.avg-row { background: #eef4fc !important; border-top: 1px solid #b8d4f0; }
+tr.avg-row td { color: #1a5fb4; font-weight: 700; font-size: 12px; }
+.rate-bar { display: inline-block; width: 45px; height: 4px; background: #e8ecf1; border-radius: 2px; margin-left: 3px; vertical-align: middle; overflow: hidden; }
+.rate-bar-fill { height: 100%; background: #3584e4; border-radius: 2px; }
+.rate-bar-fill.over { background: #2e7d32; }
+.zero { color: #bbb; }
+.staff-badge { display: inline-block; padding: 1px 6px; border-radius: 8px; font-size: 10px; font-weight: 600; }
+.badge-meet { background: #e8f5e9; color: #2e7d32; }
+.badge-miss { background: #ffebee; color: #c62828; }
+.rank-num { font-family: monospace; font-size: 12px; font-weight: 700; color: #999; }
+.rank-num.top1 { color: #e6a817; }
+.rank-num.top2 { color: #9e9e9e; }
+.rank-num.top3 { color: #cd7f32; }
+.hour-cell { min-width: 42px; border-radius: 2px; font-size: 10px; }
+.hour-nonzero { color: #333; font-weight: 600; }
+.footer { text-align: center; padding: 12px; color: #aaa; font-size: 11px; }
+.pack-unit { color: #1a5fb4; font-weight: 600; }
+.base-unit { color: #666; }
+/* 静态图表 */
+.static-chart { height: 100%; display: flex; flex-direction: column; padding: 4px; }
+.bar-chart { display: flex; align-items: flex-end; justify-content: space-around; height: 200px; padding-bottom: 20px; position: relative; }
+.bar-group { display: flex; flex-direction: column; align-items: center; flex: 1; position: relative; }
+.bar { width: 24px; border-radius: 3px 3px 0 0; min-height: 2px; }
+.bar-label { position: absolute; bottom: -18px; font-size: 10px; color: #888; }
+.bar-value { position: absolute; top: -14px; font-size: 9px; color: #3584e4; font-weight: 600; }
+.hbar-chart { display: flex; flex-direction: column; gap: 2px; padding: 4px 0; height: calc(100% - 24px); overflow: hidden; }
+.hbar-row { display: flex; align-items: center; gap: 6px; height: 24px; }
+.hbar-label { width: 58px; font-size: 11px; color: #555; text-align: right; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 600; }
+.hbar-track { flex: 1; height: 14px; background: #e8ecf1; border-radius: 3px; position: relative; }
+.hbar-fill { height: 100%; border-radius: 3px; min-width: 2px; }
+.hbar-fill.meet { background: rgba(46,125,50,0.65); }
+.hbar-fill.miss { background: rgba(198,40,40,0.55); }
+.hbar-value { width: 30px; font-size: 10px; color: #444; text-align: left; }
+.target-line-v { position: absolute; top: 28px; bottom: 4px; width: 1.5px; background: repeating-linear-gradient(to bottom, #3584e4 0, #3584e4 4px, transparent 4px, transparent 8px); }
+.target-label { position: absolute; top: 28px; background: rgba(53,132,228,0.12); color: #3584e4; font-size: 9px; padding: 1px 5px; border-radius: 3px; font-weight: 600; }
+/* 作业区进度 */
+.wa-card { background: #f8fafc; border: 1px solid #e8ecf1; border-radius: 8px; padding: 10px 14px; margin-bottom: 8px; }
+.wa-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+.wa-name { font-size: 14px; font-weight: 700; color: #333; }
+.wa-nums { font-size: 11px; color: #888; }
+.wa-bar-bg { position: relative; height: 20px; background: #e8ecf1; border-radius: 10px; overflow: hidden; }
+.wa-bar-fill { height: 100%; border-radius: 10px; transition: width 0.5s ease; }
+.wa-bar-text { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 12px; font-weight: 700; color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,0.3); }
+/* 门店状态 */
+.store-legend { display: flex; gap: 16px; margin-bottom: 10px; font-size: 12px; }
+.store-legend-item { font-weight: 600; }
+.wave-group { margin-bottom: 12px; }
+.wave-title { font-size: 13px; font-weight: 700; color: #1a5fb4; margin-bottom: 6px; padding: 3px 10px; background: #eef4fc; border-radius: 6px; display: inline-block; }
+.store-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 6px; }
+.store-card { border-radius: 6px; padding: 6px 10px; }
+.store-name { font-size: 11px; font-weight: 600; color: #333; margin-bottom: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.store-info { display: flex; justify-content: space-between; font-size: 10px; margin-bottom: 3px; }
+.store-state { font-weight: 700; }
+.store-pack { color: #888; }
+.store-progress-bg { height: 4px; background: #e0e0e0; border-radius: 2px; overflow: hidden; }
+.store-progress-fill { height: 100%; border-radius: 2px; }
+</style>
+</head>
+<body>
+<div class="dashboard">
+    <div class="header">
+        <h1>广州白云RDC · 分拣太空座舱看板</h1>
+        <div class="subtitle">松鼠便利共享中心仓 | 2026-08-26 14:38:53 | 实时数据 | 按单拣货</div>
+    </div>
+
+    <div class="progress-panel">
+        <div class="progress-header">
+            <span class="progress-title">分拣总进度</span>
+            <span class="progress-numbers">已拣 <b>11,445</b> / 应拣 <b>13,953</b>（包装单位） | 未完成 <b>2,508</b> | 差异 <b>12</b> | 基础单位 <b>14,570</b> / <b>18,184</b></span>
+        </div>
+        <div class="progress-bar-bg">
+            <div class="progress-bar-fill" style="width: 82.03%"></div>
+            <span class="progress-bar-text">82.03%</span>
+        </div>
+    </div>
+
+    <div class="panel">
+        <div class="panel-title">
+            <div class="dot"></div>
+            <h2>作业区生产进度</h2>
+        </div>
+        
+        <div class="wa-card">
+            <div class="wa-header">
+                <span class="wa-name">拆零拣货区</span>
+                <span class="wa-nums">8,663 / 8,965 件 | 任务 12/22</span>
+            </div>
+            <div class="wa-bar-bg">
+                <div class="wa-bar-fill" style="width:96.6%;background:#1a5fb4"></div>
+                <span class="wa-bar-text">96.6%</span>
+            </div>
+        </div>
+        <div class="wa-card">
+            <div class="wa-header">
+                <span class="wa-name">整箱拣货区</span>
+                <span class="wa-nums">2,782 / 4,988 件 | 任务 36/65</span>
+            </div>
+            <div class="wa-bar-bg">
+                <div class="wa-bar-fill" style="width:55.8%;background:#1a5fb4"></div>
+                <span class="wa-bar-text">55.8%</span>
+            </div>
+        </div>
+    </div>
+
+    <div class="panel">
+        <div class="panel-title">
+            <div class="dot"></div>
+            <h2>产能总览</h2>
+            <span class="badge">目标 240 件/时</span>
+        </div>
+        <div class="stats-row">
+            <div class="stat-card"><div class="label">在线人数</div><div class="value">9</div><div class="unit">人</div></div>
+            <div class="stat-card"><div class="label">总任务数</div><div class="value">87</div><div class="unit">已完成</div></div>
+            <div class="stat-card"><div class="label">总拣货量</div><div class="value">11,445</div><div class="unit">包装单位</div></div>
+            <div class="stat-card"><div class="label">基础单位</div><div class="value">14,570</div><div class="unit">件</div></div>
+            <div class="stat-card"><div class="label">平均时效</div><div class="value">293.5</div><div class="unit">件/时</div></div>
+            <div class="stat-card green"><div class="label">达标人数</div><div class="value">6</div><div class="unit">/ 9 人</div></div>
+            <div class="stat-card"><div class="label">达标率</div><div class="value">66.7%</div><div class="unit">≥ 240</div></div>
+        </div>
+
+        <div class="chart-box">
+            <div class="static-chart"><div style="font-size:12px;color:#666;font-weight:600;margin-bottom:4px;">时段总拣货量（件）</div><div class="bar-chart"><div class="bar-group"><div class="bar-value">131</div><div class="bar" style="height:7.174613402061856px;background:rgba(53,132,228,0.42110180412371134)"></div><div class="bar-label">08:00</div></div><div class="bar-group"><div class="bar-value">1,781</div><div class="bar" style="height:97.54188144329896px;background:rgba(53,132,228,0.6868878865979382)"></div><div class="bar-label">09:00</div></div><div class="bar-group"><div class="bar-value">3,104</div><div class="bar" style="height:170.0px;background:rgba(53,132,228,0.9)"></div><div class="bar-label">10:00</div></div><div class="bar-group"><div class="bar-value">1,624</div><div class="bar" style="height:88.94329896907217px;background:rgba(53,132,228,0.66159793814433)"></div><div class="bar-label">11:00</div></div><div class="bar-group"><div class="bar-value">661</div><div class="bar" style="height:36.20167525773196px;background:rgba(53,132,228,0.5064755154639176)"></div><div class="bar-label">12:00</div></div><div class="bar-group"><div class="bar-value">918</div><div class="bar" style="height:50.277061855670105px;background:rgba(53,132,228,0.5478737113402062)"></div><div class="bar-label">13:00</div></div><div class="bar-group"><div class="bar-value">1,494</div><div class="bar" style="height:81.82345360824742px;background:rgba(53,132,228,0.6406572164948454)"></div><div class="bar-label">14:00</div></div><div class="bar-group"><div class="bar-value"></div><div class="bar" style="height:0.0px;background:rgba(53,132,228,0.4)"></div><div class="bar-label">15:00</div></div><div class="bar-group"><div class="bar-value"></div><div class="bar" style="height:0.0px;background:rgba(53,132,228,0.4)"></div><div class="bar-label">16:00</div></div><div class="bar-group"><div class="bar-value"></div><div class="bar" style="height:0.0px;background:rgba(53,132,228,0.4)"></div><div class="bar-label">17:00</div></div><div class="bar-group"><div class="bar-value"></div><div class="bar" style="height:0.0px;background:rgba(53,132,228,0.4)"></div><div class="bar-label">18:00</div></div></div></div>
+        </div>
+        <div class="chart-box" style="height:380px">
+            <div class="static-chart" style="position:relative;"><div style="font-size:12px;color:#666;font-weight:600;margin-bottom:4px;">小时产能（目标 180）</div><div class="hbar-chart"><div class="hbar-row"><div class="hbar-label">邓小槐</div><div class="hbar-track"><div class="hbar-fill miss" style="width:10.756062767475036%"></div></div><div class="hbar-value">37.7</div></div><div class="hbar-row"><div class="hbar-label">邓健滔</div><div class="hbar-track"><div class="hbar-fill miss" style="width:53.29529243937233%"></div></div><div class="hbar-value">186.8</div></div><div class="hbar-row"><div class="hbar-label">黄左谟</div><div class="hbar-track"><div class="hbar-fill miss" style="width:58.77318116975749%"></div></div><div class="hbar-value">206</div></div><div class="hbar-row"><div class="hbar-label">陈德云</div><div class="hbar-track"><div class="hbar-fill meet" style="width:70.41369472182598%"></div></div><div class="hbar-value">246.8</div></div><div class="hbar-row"><div class="hbar-label">黄振彬</div><div class="hbar-track"><div class="hbar-fill meet" style="width:72.29671897289587%"></div></div><div class="hbar-value">253.4</div></div><div class="hbar-row"><div class="hbar-label">黄秀芹</div><div class="hbar-track"><div class="hbar-fill meet" style="width:79.82881597717547%"></div></div><div class="hbar-value">279.8</div></div><div class="hbar-row"><div class="hbar-label">王进亭</div><div class="hbar-track"><div class="hbar-fill meet" style="width:84.39372325249643%"></div></div><div class="hbar-value">295.8</div></div><div class="hbar-row"><div class="hbar-label">张永年</div><div class="hbar-track"><div class="hbar-fill meet" style="width:99.71469329529245%"></div></div><div class="hbar-value">349.5</div></div><div class="hbar-row"><div class="hbar-label">林伟君</div><div class="hbar-track"><div class="hbar-fill meet" style="width:100.0%"></div></div><div class="hbar-value">350.5</div></div></div><div class="target-line-v" style="left:68.47360912981455%"></div><div class="target-label" style="left:calc(68.47360912981455% + 4px)">目标 240</div></div>
+        </div>
+    </div>
+
+    <div class="panel">
+        <div class="panel-title">
+            <div class="dot"></div>
+            <h2>员工小时产能明细</h2>
+            <span class="badge">9 人</span>
+        </div>
+        <div class="table-wrap">
+            <table>
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>拣货员</th>
+                        <th>任务</th>
+                        <th>包装单位</th>
+                        <th>基础单位</th>
+                        <th>工时</th>
+                        <th>时效</th>
+                        <th>达成率</th>
+                        <th>差异</th>
+                        <th>准确率</th>
+                        <th>状态</th>
+                        <th>08:00</th>
+                        <th>09:00</th>
+                        <th>10:00</th>
+                        <th>11:00</th>
+                        <th>12:00</th>
+                        <th>13:00</th>
+                        <th>14:00</th>
+                        <th>15:00</th>
+                        <th>16:00</th>
+                        <th>17:00</th>
+                        <th>18:00</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><span class="rank-num top1">#1</span></td>
+                        <td>林伟君</td>
+                        <td>6</td>
+                        <td class="pack-unit">1,402</td>
+                        <td class="base-unit">1,935</td>
+                        <td>4h</td>
+                        <td>350.5</td>
+                        <td>
+                            146.0%
+                            <span class="rate-bar"><span class="rate-bar-fill over" style="width:100%"></span></span>
+                        </td>
+                        <td style="color:#2e7d32;font-weight:600">+110.5</td>
+                        <td>99.93%</td>
+                        <td><span class="staff-badge badge-meet">达标</span></td>
+                        <td class="hour-cell zero">-</td>
+                        <td class="hour-cell hour-nonzero">500</td>
+                        <td class="hour-cell zero">-</td>
+                        <td class="hour-cell hour-nonzero">424</td>
+                        <td class="hour-cell hour-nonzero">43</td>
+                        <td class="hour-cell hour-nonzero">435</td>
+                        <td class="hour-cell zero">-</td>
+                        <td class="hour-cell zero">-</td>
+                        <td class="hour-cell zero">-</td>
+                        <td class="hour-cell zero">-</td>
+                        <td class="hour-cell zero">-</td>
+                    </tr>
+                    <tr>
+                        <td><span class="rank-num top2">#2</span></td>
+                        <td>黄秀芹</td>
+                        <td>7</td>
+                        <td class="pack-unit">1,399</td>
+                        <td class="base-unit">1,791</td>
+                        <td>5h</td>
+                        <td>279.8</td>
+                        <td>
+                            116.6%
+                            <span class="rate-bar"><span class="rate-bar-fill over" style="width:100%"></span></span>
+                        </td>
+                        <td style="color:#2e7d32;font-weight:600">+39.8</td>
+                        <td>100%</td>
+                        <td><span class="staff-badge badge-meet">达标</span></td>
+                        <td class="hour-cell zero">-</td>
+                        <td class="hour-cell hour-nonzero">327</td>
+                        <td class="hour-cell hour-nonzero">301</td>
+                        <td class="hour-cell hour-nonzero">201</td>
+                        <td class="hour-cell hour-nonzero">71</td>
+                        <td class="hour-cell zero">-</td>
+                        <td class="hour-cell hour-nonzero">499</td>
+                        <td class="hour-cell zero">-</td>
+                        <td class="hour-cell zero">-</td>
+                        <td class="hour-cell zero">-</td>
+                        <td class="hour-cell zero">-</td>
+                    </tr>
+                    <tr>
+                        <td><span class="rank-num top3">#3</span></td>
+                        <td>张永年</td>
+                        <td>7</td>
+                        <td class="pack-unit">1,398</td>
+                        <td class="base-unit">1,790</td>
+                        <td>4h</td>
+                        <td>349.5</td>
+                        <td>
+                            145.6%
+                            <span class="rate-bar"><span class="rate-bar-fill over" style="width:100%"></span></span>
+                        </td>
+                        <td style="color:#2e7d32;font-weight:600">+109.5</td>
+                        <td>99.86%</td>
+                        <td><span class="staff-badge badge-meet">达标</span></td>
+                        <td class="hour-cell zero">-</td>
+                        <td class="hour-cell zero">-</td>
+                        <td class="hour-cell hour-nonzero">633</td>
+                        <td class="hour-cell hour-nonzero">79</td>
+                        <td class="hour-cell hour-nonzero">188</td>
+                        <td class="hour-cell zero">-</td>
+                        <td class="hour-cell hour-nonzero">498</td>
+                        <td class="hour-cell zero">-</td>
+                        <td class="hour-cell zero">-</td>
+                        <td class="hour-cell zero">-</td>
+                        <td class="hour-cell zero">-</td>
+                    </tr>
+                    <tr>
+                        <td><span class="rank-num">#4</span></td>
+                        <td>黄振彬</td>
+                        <td>6</td>
+                        <td class="pack-unit">1,267</td>
+                        <td class="base-unit">1,500</td>
+                        <td>5h</td>
+                        <td>253.4</td>
+                        <td>
+                            105.6%
+                            <span class="rate-bar"><span class="rate-bar-fill over" style="width:100%"></span></span>
+                        </td>
+                        <td style="color:#2e7d32;font-weight:600">+13.4</td>
+                        <td>99.61%</td>
+                        <td><span class="staff-badge badge-meet">达标</span></td>
+                        <td class="hour-cell zero">-</td>
+                        <td class="hour-cell zero">-</td>
+                        <td class="hour-cell hour-nonzero">489</td>
+                        <td class="hour-cell hour-nonzero">165</td>
+                        <td class="hour-cell hour-nonzero">67</td>
+                        <td class="hour-cell hour-nonzero">49</td>
+                        <td class="hour-cell hour-nonzero">497</td>
+                        <td class="hour-cell zero">-</td>
+                        <td class="hour-cell zero">-</td>
+                        <td class="hour-cell zero">-</td>
+                        <td class="hour-cell zero">-</td>
+                    </tr>
+                    <tr>
+                        <td><span class="rank-num">#5</span></td>
+                        <td>王进亭</td>
+                        <td>6</td>
+                        <td class="pack-unit">1,183</td>
+                        <td class="base-unit">1,414</td>
+                        <td>4h</td>
+                        <td>295.8</td>
+                        <td>
+                            123.3%
+                            <span class="rate-bar"><span class="rate-bar-fill over" style="width:100%"></span></span>
+                        </td>
+                        <td style="color:#2e7d32;font-weight:600">+55.8</td>
+                        <td>100%</td>
+                        <td><span class="staff-badge badge-meet">达标</span></td>
+                        <td class="hour-cell zero">-</td>
+                        <td class="hour-cell zero">-</td>
+                        <td class="hour-cell hour-nonzero">671</td>
+                        <td class="hour-cell hour-nonzero">152</td>
+                        <td class="hour-cell hour-nonzero">120</td>
+                        <td class="hour-cell hour-nonzero">240</td>
+                        <td class="hour-cell zero">-</td>
+                        <td class="hour-cell zero">-</td>
+                        <td class="hour-cell zero">-</td>
+                        <td class="hour-cell zero">-</td>
+                        <td class="hour-cell zero">-</td>
+                    </tr>
+                    <tr>
+                        <td><span class="rank-num">#6</span></td>
+                        <td>黄左谟</td>
+                        <td>6</td>
+                        <td class="pack-unit">1,030</td>
+                        <td class="base-unit">1,359</td>
+                        <td>5h</td>
+                        <td>206</td>
+                        <td>
+                            85.8%
+                            <span class="rate-bar"><span class="rate-bar-fill" style="width:85.8%"></span></span>
+                        </td>
+                        <td style="color:#c62828;font-weight:600">-34</td>
+                        <td>100%</td>
+                        <td><span class="staff-badge badge-miss">未达标</span></td>
+                        <td class="hour-cell zero">-</td>
+                        <td class="hour-cell hour-nonzero">499</td>
+                        <td class="hour-cell hour-nonzero">186</td>
+                        <td class="hour-cell hour-nonzero">162</td>
+                        <td class="hour-cell hour-nonzero">111</td>
+                        <td class="hour-cell hour-nonzero">72</td>
+                        <td class="hour-cell zero">-</td>
+                        <td class="hour-cell zero">-</td>
+                        <td class="hour-cell zero">-</td>
+                        <td class="hour-cell zero">-</td>
+                        <td class="hour-cell zero">-</td>
+                    </tr>
+                    <tr>
+                        <td><span class="rank-num">#7</span></td>
+                        <td>陈德云</td>
+                        <td>6</td>
+                        <td class="pack-unit">987</td>
+                        <td class="base-unit">1,273</td>
+                        <td>4h</td>
+                        <td>246.8</td>
+                        <td>
+                            102.8%
+                            <span class="rate-bar"><span class="rate-bar-fill over" style="width:100%"></span></span>
+                        </td>
+                        <td style="color:#2e7d32;font-weight:600">+6.8</td>
+                        <td>99.9%</td>
+                        <td><span class="staff-badge badge-meet">达标</span></td>
+                        <td class="hour-cell zero">-</td>
+                        <td class="hour-cell hour-nonzero">411</td>
+                        <td class="hour-cell hour-nonzero">266</td>
+                        <td class="hour-cell hour-nonzero">242</td>
+                        <td class="hour-cell zero">-</td>
+                        <td class="hour-cell hour-nonzero">68</td>
+                        <td class="hour-cell zero">-</td>
+                        <td class="hour-cell zero">-</td>
+                        <td class="hour-cell zero">-</td>
+                        <td class="hour-cell zero">-</td>
+                        <td class="hour-cell zero">-</td>
+                    </tr>
+                    <tr>
+                        <td><span class="rank-num">#8</span></td>
+                        <td>邓健滔</td>
+                        <td>5</td>
+                        <td class="pack-unit">934</td>
+                        <td class="base-unit">1,142</td>
+                        <td>5h</td>
+                        <td>186.8</td>
+                        <td>
+                            77.8%
+                            <span class="rate-bar"><span class="rate-bar-fill" style="width:77.8%"></span></span>
+                        </td>
+                        <td style="color:#c62828;font-weight:600">-53.2</td>
+                        <td>99.79%</td>
+                        <td><span class="staff-badge badge-miss">未达标</span></td>
+                        <td class="hour-cell hour-nonzero">131</td>
+                        <td class="hour-cell zero">-</td>
+                        <td class="hour-cell hour-nonzero">497</td>
+                        <td class="hour-cell hour-nonzero">191</td>
+                        <td class="hour-cell hour-nonzero">61</td>
+                        <td class="hour-cell hour-nonzero">54</td>
+                        <td class="hour-cell zero">-</td>
+                        <td class="hour-cell zero">-</td>
+                        <td class="hour-cell zero">-</td>
+                        <td class="hour-cell zero">-</td>
+                        <td class="hour-cell zero">-</td>
+                    </tr>
+                    <tr>
+                        <td><span class="rank-num">#9</span></td>
+                        <td>邓小槐</td>
+                        <td>4</td>
+                        <td class="pack-unit">113</td>
+                        <td class="base-unit">122</td>
+                        <td>3h</td>
+                        <td>37.7</td>
+                        <td>
+                            15.7%
+                            <span class="rate-bar"><span class="rate-bar-fill" style="width:15.7%"></span></span>
+                        </td>
+                        <td style="color:#c62828;font-weight:600">-202.3</td>
+                        <td>100%</td>
+                        <td><span class="staff-badge badge-miss">未达标</span></td>
+                        <td class="hour-cell zero">-</td>
+                        <td class="hour-cell hour-nonzero">44</td>
+                        <td class="hour-cell hour-nonzero">61</td>
+                        <td class="hour-cell hour-nonzero">8</td>
+                        <td class="hour-cell zero">-</td>
+                        <td class="hour-cell zero">-</td>
+                        <td class="hour-cell zero">-</td>
+                        <td class="hour-cell zero">-</td>
+                        <td class="hour-cell zero">-</td>
+                        <td class="hour-cell zero">-</td>
+                        <td class="hour-cell zero">-</td>
+                    </tr>
+                    <tr class="avg-row">
+                        <td colspan="3">小时合计</td>
+                        <td class="pack-unit">9,713</td>
+                        <td class="base-unit">12,326</td>
+                        <td>-</td><td>-</td><td>-</td><td>-</td><td>-</td><td>-</td>
+                        <td><b>131</b></td>
+                        <td><b>1,781</b></td>
+                        <td><b>3,104</b></td>
+                        <td><b>1,624</b></td>
+                        <td><b>661</b></td>
+                        <td><b>918</b></td>
+                        <td><b>1,494</b></td>
+                        <td><b>0</b></td>
+                        <td><b>0</b></td>
+                        <td><b>0</b></td>
+                        <td><b>0</b></td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="panel">
+        <div class="panel-title">
+            <div class="dot"></div>
+            <h2>门店生产状态</h2>
+            <span class="badge">92 门店</span>
+        </div>
+        <div class="store-legend"><span class="store-legend-item" style="color:#2e7d32">● 已完成 34</span> <span class="store-legend-item" style="color:#999">● 今日不生产 29</span> <span class="store-legend-item" style="color:#666">● 未开始 28</span> <span class="store-legend-item" style="color:#e6a817">● 进行中 1</span></div>
+        <div class="wave-group"><div class="wave-title">1波次</div><div class="store-grid"><div class="store-card" style="border-left:3px solid #2e7d32;background:#e8f5e9">
+            <div class="store-name">松鼠便利超市（环球港店）</div>
+            <div class="store-info"><span class="store-state" style="color:#2e7d32">已完成</span><span class="store-pack">191/191</span></div>
+            <div class="store-progress-bg"><div class="store-progress-fill" style="width:100%;background:#2e7d32"></div></div>
+        </div><div class="store-card" style="border-left:3px solid #2e7d32;background:#e8f5e9">
+            <div class="store-name">松鼠便利超市（德胜中路店）</div>
+            <div class="store-info"><span class="store-state" style="color:#2e7d32">已完成</span><span class="store-pack">171/171</span></div>
+            <div class="store-progress-bg"><div class="store-progress-fill" style="width:100%;background:#2e7d32"></div></div>
+        </div><div class="store-card" style="border-left:3px solid #2e7d32;background:#e8f5e9">
+            <div class="store-name">松鼠便利超市（新华北路店）</div>
+            <div class="store-info"><span class="store-state" style="color:#2e7d32">已完成</span><span class="store-pack">162/162</span></div>
+            <div class="store-progress-bg"><div class="store-progress-fill" style="width:100%;background:#2e7d32"></div></div>
+        </div><div class="store-card" style="border-left:3px solid #2e7d32;background:#e8f5e9">
+            <div class="store-name">松鼠便利超市（顺盈广场店）</div>
+            <div class="store-info"><span class="store-state" style="color:#2e7d32">已完成</span><span class="store-pack">152/152</span></div>
+            <div class="store-progress-bg"><div class="store-progress-fill" style="width:100%;background:#2e7d32"></div></div>
+        </div><div class="store-card" style="border-left:3px solid #2e7d32;background:#e8f5e9">
+            <div class="store-name">松鼠便利超市（太阳城店）</div>
+            <div class="store-info"><span class="store-state" style="color:#2e7d32">已完成</span><span class="store-pack">133/133</span></div>
+            <div class="store-progress-bg"><div class="store-progress-fill" style="width:100%;background:#2e7d32"></div></div>
+        </div><div class="store-card" style="border-left:3px solid #2e7d32;background:#e8f5e9">
+            <div class="store-name">松鼠便利超市（城市花园店）</div>
+            <div class="store-info"><span class="store-state" style="color:#2e7d32">已完成</span><span class="store-pack">131/131</span></div>
+            <div class="store-progress-bg"><div class="store-progress-fill" style="width:100%;background:#2e7d32"></div></div>
+        </div><div class="store-card" style="border-left:3px solid #2e7d32;background:#e8f5e9">
+            <div class="store-name">松鼠便利超市（骏壹万邦店）</div>
+            <div class="store-info"><span class="store-state" style="color:#2e7d32">已完成</span><span class="store-pack">131/131</span></div>
+            <div class="store-progress-bg"><div class="store-progress-fill" style="width:100%;background:#2e7d32"></div></div>
+        </div><div class="store-card" style="border-left:3px solid #2e7d32;background:#e8f5e9">
+            <div class="store-name">松鼠便利超市（樵顺广场店）</div>
+            <div class="store-info"><span class="store-state" style="color:#2e7d32">已完成</span><span class="store-pack">114/114</span></div>
+            <div class="store-progress-bg"><div class="store-progress-fill" style="width:100%;background:#2e7d32"></div></div>
+        </div><div class="store-card" style="border-left:3px solid #2e7d32;background:#e8f5e9">
+            <div class="store-name">松鼠便利超市（万达广场店）</div>
+            <div class="store-info"><span class="store-state" style="color:#2e7d32">已完成</span><span class="store-pack">106/106</span></div>
+            <div class="store-progress-bg"><div class="store-progress-fill" style="width:100%;background:#2e7d32"></div></div>
+        </div><div class="store-card" style="border-left:3px solid #2e7d32;background:#e8f5e9">
+            <div class="store-name">松鼠便利超市（季华路店）</div>
+            <div class="store-info"><span class="store-state" style="color:#2e7d32">已完成</span><span class="store-pack">100/100</span></div>
+            <div class="store-progress-bg"><div class="store-progress-fill" style="width:100%;background:#2e7d32"></div></div>
+        </div><div class="store-card" style="border-left:3px solid #2e7d32;background:#e8f5e9">
+            <div class="store-name">松鼠便利超市（英德维港店）</div>
+            <div class="store-info"><span class="store-state" style="color:#2e7d32">已完成</span><span class="store-pack">88/88</span></div>
+            <div class="store-progress-bg"><div class="store-progress-fill" style="width:100%;background:#2e7d32"></div></div>
+        </div><div class="store-card" style="border-left:3px solid #2e7d32;background:#e8f5e9">
+            <div class="store-name">松鼠便利超市（智慧新城店）</div>
+            <div class="store-info"><span class="store-state" style="color:#2e7d32">已完成</span><span class="store-pack">73/73</span></div>
+            <div class="store-progress-bg"><div class="store-progress-fill" style="width:100%;background:#2e7d32"></div></div>
+        </div><div class="store-card" style="border-left:3px solid #2e7d32;background:#e8f5e9">
+            <div class="store-name">松鼠便利超市（三水店）</div>
+            <div class="store-info"><span class="store-state" style="color:#2e7d32">已完成</span><span class="store-pack">72/72</span></div>
+            <div class="store-progress-bg"><div class="store-progress-fill" style="width:100%;background:#2e7d32"></div></div>
+        </div><div class="store-card" style="border-left:3px solid #2e7d32;background:#e8f5e9">
+            <div class="store-name">松鼠便利超市（狮岭店）</div>
+            <div class="store-info"><span class="store-state" style="color:#2e7d32">已完成</span><span class="store-pack">72/72</span></div>
+            <div class="store-progress-bg"><div class="store-progress-fill" style="width:100%;background:#2e7d32"></div></div>
+        </div><div class="store-card" style="border-left:3px solid #2e7d32;background:#e8f5e9">
+            <div class="store-name">松鼠便利超市（张槎店）</div>
+            <div class="store-info"><span class="store-state" style="color:#2e7d32">已完成</span><span class="store-pack">71/71</span></div>
+            <div class="store-progress-bg"><div class="store-progress-fill" style="width:100%;background:#2e7d32"></div></div>
+        </div><div class="store-card" style="border-left:3px solid #2e7d32;background:#e8f5e9">
+            <div class="store-name">松鼠便利超市（岭南路店）</div>
+            <div class="store-info"><span class="store-state" style="color:#2e7d32">已完成</span><span class="store-pack">71/71</span></div>
+            <div class="store-progress-bg"><div class="store-progress-fill" style="width:100%;background:#2e7d32"></div></div>
+        </div><div class="store-card" style="border-left:3px solid #2e7d32;background:#e8f5e9">
+            <div class="store-name">松鼠便利超市（东平店）</div>
+            <div class="store-info"><span class="store-state" style="color:#2e7d32">已完成</span><span class="store-pack">69/69</span></div>
+            <div class="store-progress-bg"><div class="store-progress-fill" style="width:100%;background:#2e7d32"></div></div>
+        </div><div class="store-card" style="border-left:3px solid #2e7d32;background:#e8f5e9">
+            <div class="store-name">松鼠便利超市（金沙洲店）</div>
+            <div class="store-info"><span class="store-state" style="color:#2e7d32">已完成</span><span class="store-pack">67/67</span></div>
+            <div class="store-progress-bg"><div class="store-progress-fill" style="width:100%;background:#2e7d32"></div></div>
+        </div><div class="store-card" style="border-left:3px solid #2e7d32;background:#e8f5e9">
+            <div class="store-name">松鼠便利超市（里水店）</div>
+            <div class="store-info"><span class="store-state" style="color:#2e7d32">已完成</span><span class="store-pack">61/61</span></div>
+            <div class="store-progress-bg"><div class="store-progress-fill" style="width:100%;background:#2e7d32"></div></div>
+        </div><div class="store-card" style="border-left:3px solid #2e7d32;background:#e8f5e9">
+            <div class="store-name">松鼠便利超市（狮山店）</div>
+            <div class="store-info"><span class="store-state" style="color:#2e7d32">已完成</span><span class="store-pack">61/61</span></div>
+            <div class="store-progress-bg"><div class="store-progress-fill" style="width:100%;background:#2e7d32"></div></div>
+        </div><div class="store-card" style="border-left:3px solid #2e7d32;background:#e8f5e9">
+            <div class="store-name">松鼠便利超市（嘉洲店）</div>
+            <div class="store-info"><span class="store-state" style="color:#2e7d32">已完成</span><span class="store-pack">60/60</span></div>
+            <div class="store-progress-bg"><div class="store-progress-fill" style="width:100%;background:#2e7d32"></div></div>
+        </div><div class="store-card" style="border-left:3px solid #2e7d32;background:#e8f5e9">
+            <div class="store-name">松鼠便利超市（夏东店）</div>
+            <div class="store-info"><span class="store-state" style="color:#2e7d32">已完成</span><span class="store-pack">59/59</span></div>
+            <div class="store-progress-bg"><div class="store-progress-fill" style="width:100%;background:#2e7d32"></div></div>
+        </div><div class="store-card" style="border-left:3px solid #2e7d32;background:#e8f5e9">
+            <div class="store-name">松鼠便利超市（北滘新城店）</div>
+            <div class="store-info"><span class="store-state" style="color:#2e7d32">已完成</span><span class="store-pack">54/54</span></div>
+            <div class="store-progress-bg"><div class="store-progress-fill" style="width:100%;background:#2e7d32"></div></div>
+        </div><div class="store-card" style="border-left:3px solid #2e7d32;background:#e8f5e9">
+            <div class="store-name">松鼠便利超市（魁奇路店）</div>
+            <div class="store-info"><span class="store-state" style="color:#2e7d32">已完成</span><span class="store-pack">51/51</span></div>
+            <div class="store-progress-bg"><div class="store-progress-fill" style="width:100%;background:#2e7d32"></div></div>
+        </div><div class="store-card" style="border-left:3px solid #2e7d32;background:#e8f5e9">
+            <div class="store-name">松鼠便利超市（细滘店）</div>
+            <div class="store-info"><span class="store-state" style="color:#2e7d32">已完成</span><span class="store-pack">49/49</span></div>
+            <div class="store-progress-bg"><div class="store-progress-fill" style="width:100%;background:#2e7d32"></div></div>
+        </div><div class="store-card" style="border-left:3px solid #2e7d32;background:#e8f5e9">
+            <div class="store-name">松鼠便利超市（桂城店）</div>
+            <div class="store-info"><span class="store-state" style="color:#2e7d32">已完成</span><span class="store-pack">47/47</span></div>
+            <div class="store-progress-bg"><div class="store-progress-fill" style="width:100%;background:#2e7d32"></div></div>
+        </div><div class="store-card" style="border-left:3px solid #2e7d32;background:#e8f5e9">
+            <div class="store-name">松鼠便利超市（大良店）</div>
+            <div class="store-info"><span class="store-state" style="color:#2e7d32">已完成</span><span class="store-pack">46/46</span></div>
+            <div class="store-progress-bg"><div class="store-progress-fill" style="width:100%;background:#2e7d32"></div></div>
+        </div><div class="store-card" style="border-left:3px solid #2e7d32;background:#e8f5e9">
+            <div class="store-name">松鼠便利超市（清布店）</div>
+            <div class="store-info"><span class="store-state" style="color:#2e7d32">已完成</span><span class="store-pack">44/44</span></div>
+            <div class="store-progress-bg"><div class="store-progress-fill" style="width:100%;background:#2e7d32"></div></div>
+        </div><div class="store-card" style="border-left:3px solid #2e7d32;background:#e8f5e9">
+            <div class="store-name">松鼠便利超市（花都广场店）</div>
+            <div class="store-info"><span class="store-state" style="color:#2e7d32">已完成</span><span class="store-pack">43/43</span></div>
+            <div class="store-progress-bg"><div class="store-progress-fill" style="width:100%;background:#2e7d32"></div></div>
+        </div><div class="store-card" style="border-left:3px solid #2e7d32;background:#e8f5e9">
+            <div class="store-name">松鼠便利超市（容桂店）</div>
+            <div class="store-info"><span class="store-state" style="color:#2e7d32">已完成</span><span class="store-pack">40/40</span></div>
+            <div class="store-progress-bg"><div class="store-progress-fill" style="width:100%;background:#2e7d32"></div></div>
+        </div><div class="store-card" style="border-left:3px solid #2e7d32;background:#e8f5e9">
+            <div class="store-name">松鼠便利超市（罗村店）</div>
+            <div class="store-info"><span class="store-state" style="color:#2e7d32">已完成</span><span class="store-pack">40/40</span></div>
+            <div class="store-progress-bg"><div class="store-progress-fill" style="width:100%;background:#2e7d32"></div></div>
+        </div><div class="store-card" style="border-left:3px solid #2e7d32;background:#e8f5e9">
+            <div class="store-name">松鼠便利超市（大沥店）</div>
+            <div class="store-info"><span class="store-state" style="color:#2e7d32">已完成</span><span class="store-pack">39/39</span></div>
+            <div class="store-progress-bg"><div class="store-progress-fill" style="width:100%;background:#2e7d32"></div></div>
+        </div><div class="store-card" style="border-left:3px solid #2e7d32;background:#e8f5e9">
+            <div class="store-name">松鼠便利超市（机场北店）</div>
+            <div class="store-info"><span class="store-state" style="color:#2e7d32">已完成</span><span class="store-pack">36/36</span></div>
+            <div class="store-progress-bg"><div class="store-progress-fill" style="width:100%;background:#2e7d32"></div></div>
+        </div><div class="store-card" style="border-left:3px solid #2e7d32;background:#e8f5e9">
+            <div class="store-name">松鼠便利超市（千灯湖店）</div>
+            <div class="store-info"><span class="store-state" style="color:#2e7d32">已完成</span><span class="store-pack">33/33</span></div>
+            <div class="store-progress-bg"><div class="store-progress-fill" style="width:100%;background:#2e7d32"></div></div>
+        </div><div class="store-card" style="border-left:3px solid #666;background:#f5f5f5">
+            <div class="store-name">松鼠便利超市（板桥店）</div>
+            <div class="store-info"><span class="store-state" style="color:#666">未开始</span><span class="store-pack">0/38</span></div>
+            
+        </div><div class="store-card" style="border-left:3px solid #999;background:#fafafa">
+            <div class="store-name">松鼠便利超市（宝翠园店）</div>
+            <div class="store-info"><span class="store-state" style="color:#999">今日不生产</span><span class="store-pack">-</span></div>
+            
+        </div><div class="store-card" style="border-left:3px solid #999;background:#fafafa">
+            <div class="store-name">松鼠便利超市（星湖店）</div>
+            <div class="store-info"><span class="store-state" style="color:#999">今日不生产</span><span class="store-pack">-</span></div>
+            
+        </div><div class="store-card" style="border-left:3px solid #999;background:#fafafa">
+            <div class="store-name">松鼠便利超市（信安店）</div>
+            <div class="store-info"><span class="store-state" style="color:#999">今日不生产</span><span class="store-pack">-</span></div>
+            
+        </div><div class="store-card" style="border-left:3px solid #999;background:#fafafa">
+            <div class="store-name">松鼠便利超市（城西街道店）</div>
+            <div class="store-info"><span class="store-state" style="color:#999">今日不生产</span><span class="store-pack">-</span></div>
+            
+        </div><div class="store-card" style="border-left:3px solid #999;background:#fafafa">
+            <div class="store-name">松鼠便利超市（城东店）</div>
+            <div class="store-info"><span class="store-state" style="color:#999">今日不生产</span><span class="store-pack">-</span></div>
+            
+        </div><div class="store-card" style="border-left:3px solid #999;background:#fafafa">
+            <div class="store-name">松鼠便利超市（大旺广场店）</div>
+            <div class="store-info"><span class="store-state" style="color:#999">今日不生产</span><span class="store-pack">-</span></div>
+            
+        </div><div class="store-card" style="border-left:3px solid #999;background:#fafafa">
+            <div class="store-name">松鼠便利超市（四会东城店）</div>
+            <div class="store-info"><span class="store-state" style="color:#999">今日不生产</span><span class="store-pack">-</span></div>
+            
+        </div><div class="store-card" style="border-left:3px solid #999;background:#fafafa">
+            <div class="store-name">松鼠便利超市（都汇豪庭店）</div>
+            <div class="store-info"><span class="store-state" style="color:#999">今日不生产</span><span class="store-pack">-</span></div>
+            
+        </div><div class="store-card" style="border-left:3px solid #999;background:#fafafa">
+            <div class="store-name">松鼠便利超市（怀城店）</div>
+            <div class="store-info"><span class="store-state" style="color:#999">今日不生产</span><span class="store-pack">-</span></div>
+            
+        </div></div></div><div class="wave-group"><div class="wave-title">2波次</div><div class="store-grid"><div class="store-card" style="border-left:3px solid #e6a817;background:#fff8e1">
+            <div class="store-name">松鼠便利超市（宝岗店）</div>
+            <div class="store-info"><span class="store-state" style="color:#e6a817">进行中</span><span class="store-pack">38/185</span></div>
+            <div class="store-progress-bg"><div class="store-progress-fill" style="width:0%;background:#e6a817"></div></div>
+        </div><div class="store-card" style="border-left:3px solid #666;background:#f5f5f5">
+            <div class="store-name">松鼠便利超市（荔湾店）</div>
+            <div class="store-info"><span class="store-state" style="color:#666">未开始</span><span class="store-pack">0/144</span></div>
+            
+        </div><div class="store-card" style="border-left:3px solid #666;background:#f5f5f5">
+            <div class="store-name">松鼠便利超市（淘金店）</div>
+            <div class="store-info"><span class="store-state" style="color:#666">未开始</span><span class="store-pack">0/132</span></div>
+            
+        </div><div class="store-card" style="border-left:3px solid #666;background:#f5f5f5">
+            <div class="store-name">松鼠便利超市（新塘永旺店）</div>
+            <div class="store-info"><span class="store-state" style="color:#666">未开始</span><span class="store-pack">0/132</span></div>
+            
+        </div><div class="store-card" style="border-left:3px solid #666;background:#f5f5f5">
+            <div class="store-name">松鼠便利超市（钟村店）</div>
+            <div class="store-info"><span class="store-state" style="color:#666">未开始</span><span class="store-pack">0/123</span></div>
+            
+        </div><div class="store-card" style="border-left:3px solid #666;background:#f5f5f5">
+            <div class="store-name">松鼠便利超市（西塱店）</div>
+            <div class="store-info"><span class="store-state" style="color:#666">未开始</span><span class="store-pack">0/121</span></div>
+            
+        </div><div class="store-card" style="border-left:3px solid #666;background:#f5f5f5">
+            <div class="store-name">松鼠便利超市（万科云城店）</div>
+            <div class="store-info"><span class="store-state" style="color:#666">未开始</span><span class="store-pack">0/119</span></div>
+            
+        </div><div class="store-card" style="border-left:3px solid #666;background:#f5f5f5">
+            <div class="store-name">松鼠便利超市（石井店）</div>
+            <div class="store-info"><span class="store-state" style="color:#666">未开始</span><span class="store-pack">0/113</span></div>
+            
+        </div><div class="store-card" style="border-left:3px solid #666;background:#f5f5f5">
+            <div class="store-name">松鼠便利超市（大山店）</div>
+            <div class="store-info"><span class="store-state" style="color:#666">未开始</span><span class="store-pack">0/111</span></div>
+            
+        </div><div class="store-card" style="border-left:3px solid #666;background:#f5f5f5">
+            <div class="store-name">松鼠便利超市（珠村店）</div>
+            <div class="store-info"><span class="store-state" style="color:#666">未开始</span><span class="store-pack">0/110</span></div>
+            
+        </div><div class="store-card" style="border-left:3px solid #666;background:#f5f5f5">
+            <div class="store-name">松鼠便利超市（龙洞店）</div>
+            <div class="store-info"><span class="store-state" style="color:#666">未开始</span><span class="store-pack">0/104</span></div>
+            
+        </div><div class="store-card" style="border-left:3px solid #666;background:#f5f5f5">
+            <div class="store-name">松鼠便利超市（五羊邨店）</div>
+            <div class="store-info"><span class="store-state" style="color:#666">未开始</span><span class="store-pack">0/93</span></div>
+            
+        </div><div class="store-card" style="border-left:3px solid #666;background:#f5f5f5">
+            <div class="store-name">松鼠便利超市（动物园店）</div>
+            <div class="store-info"><span class="store-state" style="color:#666">未开始</span><span class="store-pack">0/73</span></div>
+            
+        </div><div class="store-card" style="border-left:3px solid #666;background:#f5f5f5">
+            <div class="store-name">松鼠便利超市（燕塘店）</div>
+            <div class="store-info"><span class="store-state" style="color:#666">未开始</span><span class="store-pack">0/64</span></div>
+            
+        </div><div class="store-card" style="border-left:3px solid #666;background:#f5f5f5">
+            <div class="store-name">松鼠便利超市（南村店）</div>
+            <div class="store-info"><span class="store-state" style="color:#666">未开始</span><span class="store-pack">0/60</span></div>
+            
+        </div><div class="store-card" style="border-left:3px solid #666;background:#f5f5f5">
+            <div class="store-name">松鼠便利超市（金洲店）</div>
+            <div class="store-info"><span class="store-state" style="color:#666">未开始</span><span class="store-pack">0/58</span></div>
+            
+        </div><div class="store-card" style="border-left:3px solid #666;background:#f5f5f5">
+            <div class="store-name">松鼠便利超市（员村店）</div>
+            <div class="store-info"><span class="store-state" style="color:#666">未开始</span><span class="store-pack">0/58</span></div>
+            
+        </div><div class="store-card" style="border-left:3px solid #666;background:#f5f5f5">
+            <div class="store-name">松鼠便利超市（钧明店）</div>
+            <div class="store-info"><span class="store-state" style="color:#666">未开始</span><span class="store-pack">0/53</span></div>
+            
+        </div><div class="store-card" style="border-left:3px solid #666;background:#f5f5f5">
+            <div class="store-name">松鼠便利超市（客村店）</div>
+            <div class="store-info"><span class="store-state" style="color:#666">未开始</span><span class="store-pack">0/45</span></div>
+            
+        </div><div class="store-card" style="border-left:3px solid #666;background:#f5f5f5">
+            <div class="store-name">松鼠便利超市（琶洲南店）</div>
+            <div class="store-info"><span class="store-state" style="color:#666">未开始</span><span class="store-pack">0/44</span></div>
+            
+        </div><div class="store-card" style="border-left:3px solid #666;background:#f5f5f5">
+            <div class="store-name">松鼠便利超市（石溪店）</div>
+            <div class="store-info"><span class="store-state" style="color:#666">未开始</span><span class="store-pack">0/44</span></div>
+            
+        </div><div class="store-card" style="border-left:3px solid #666;background:#f5f5f5">
+            <div class="store-name">松鼠便利超市（市桥店）</div>
+            <div class="store-info"><span class="store-state" style="color:#666">未开始</span><span class="store-pack">0/42</span></div>
+            
+        </div><div class="store-card" style="border-left:3px solid #666;background:#f5f5f5">
+            <div class="store-name">松鼠便利超市（南岗店）</div>
+            <div class="store-info"><span class="store-state" style="color:#666">未开始</span><span class="store-pack">0/41</span></div>
+            
+        </div><div class="store-card" style="border-left:3px solid #666;background:#f5f5f5">
+            <div class="store-name">松鼠便利超市（新塘店）</div>
+            <div class="store-info"><span class="store-state" style="color:#666">未开始</span><span class="store-pack">0/31</span></div>
+            
+        </div><div class="store-card" style="border-left:3px solid #666;background:#f5f5f5">
+            <div class="store-name">松鼠便利超市（广州大学城店）</div>
+            <div class="store-info"><span class="store-state" style="color:#666">未开始</span><span class="store-pack">0/30</span></div>
+            
+        </div><div class="store-card" style="border-left:3px solid #666;background:#f5f5f5">
+            <div class="store-name">松鼠便利超市（荔城店）</div>
+            <div class="store-info"><span class="store-state" style="color:#666">未开始</span><span class="store-pack">0/29</span></div>
+            
+        </div><div class="store-card" style="border-left:3px solid #666;background:#f5f5f5">
+            <div class="store-name">松鼠便利超市（番禺永旺店）</div>
+            <div class="store-info"><span class="store-state" style="color:#666">未开始</span><span class="store-pack">0/25</span></div>
+            
+        </div><div class="store-card" style="border-left:3px solid #666;background:#f5f5f5">
+            <div class="store-name">松鼠便利超市（金铂店）</div>
+            <div class="store-info"><span class="store-state" style="color:#666">未开始</span><span class="store-pack">0/22</span></div>
+            
+        </div><div class="store-card" style="border-left:3px solid #999;background:#fafafa">
+            <div class="store-name">松鼠便利超市（永平店）</div>
+            <div class="store-info"><span class="store-state" style="color:#999">今日不生产</span><span class="store-pack">-</span></div>
+            
+        </div></div></div><div class="wave-group"><div class="wave-title">3波次</div><div class="store-grid"><div class="store-card" style="border-left:3px solid #999;background:#fafafa">
+            <div class="store-name">松鼠便利超市（江夏店）</div>
+            <div class="store-info"><span class="store-state" style="color:#999">今日不生产</span><span class="store-pack">-</span></div>
+            
+        </div><div class="store-card" style="border-left:3px solid #999;background:#fafafa">
+            <div class="store-name">松鼠便利超市（棠溪店）</div>
+            <div class="store-info"><span class="store-state" style="color:#999">今日不生产</span><span class="store-pack">-</span></div>
+            
+        </div><div class="store-card" style="border-left:3px solid #999;background:#fafafa">
+            <div class="store-name">松鼠便利超市（龙归店）</div>
+            <div class="store-info"><span class="store-state" style="color:#999">今日不生产</span><span class="store-pack">-</span></div>
+            
+        </div><div class="store-card" style="border-left:3px solid #999;background:#fafafa">
+            <div class="store-name">松鼠便利超市（永泰店）</div>
+            <div class="store-info"><span class="store-state" style="color:#999">今日不生产</span><span class="store-pack">-</span></div>
+            
+        </div><div class="store-card" style="border-left:3px solid #999;background:#fafafa">
+            <div class="store-name">松鼠便利超市（人和店）</div>
+            <div class="store-info"><span class="store-state" style="color:#999">今日不生产</span><span class="store-pack">-</span></div>
+            
+        </div><div class="store-card" style="border-left:3px solid #999;background:#fafafa">
+            <div class="store-name">松鼠便利超市（珠江新城店）</div>
+            <div class="store-info"><span class="store-state" style="color:#999">今日不生产</span><span class="store-pack">-</span></div>
+            
+        </div><div class="store-card" style="border-left:3px solid #999;background:#fafafa">
+            <div class="store-name">松鼠便利超市（横沙地铁店）</div>
+            <div class="store-info"><span class="store-state" style="color:#999">今日不生产</span><span class="store-pack">-</span></div>
+            
+        </div><div class="store-card" style="border-left:3px solid #999;background:#fafafa">
+            <div class="store-name">松鼠便利超市（昌岗店）</div>
+            <div class="store-info"><span class="store-state" style="color:#999">今日不生产</span><span class="store-pack">-</span></div>
+            
+        </div><div class="store-card" style="border-left:3px solid #999;background:#fafafa">
+            <div class="store-name">松鼠便利超市（同和店）</div>
+            <div class="store-info"><span class="store-state" style="color:#999">今日不生产</span><span class="store-pack">-</span></div>
+            
+        </div><div class="store-card" style="border-left:3px solid #999;background:#fafafa">
+            <div class="store-name">松鼠便利超市（三元里店）</div>
+            <div class="store-info"><span class="store-state" style="color:#999">今日不生产</span><span class="store-pack">-</span></div>
+            
+        </div><div class="store-card" style="border-left:3px solid #999;background:#fafafa">
+            <div class="store-name">松鼠便利超市（车陂店）</div>
+            <div class="store-info"><span class="store-state" style="color:#999">今日不生产</span><span class="store-pack">-</span></div>
+            
+        </div><div class="store-card" style="border-left:3px solid #999;background:#fafafa">
+            <div class="store-name">松鼠便利超市（华景店）</div>
+            <div class="store-info"><span class="store-state" style="color:#999">今日不生产</span><span class="store-pack">-</span></div>
+            
+        </div><div class="store-card" style="border-left:3px solid #999;background:#fafafa">
+            <div class="store-name">松鼠便利超市（花地湾店）</div>
+            <div class="store-info"><span class="store-state" style="color:#999">今日不生产</span><span class="store-pack">-</span></div>
+            
+        </div><div class="store-card" style="border-left:3px solid #999;background:#fafafa">
+            <div class="store-name">松鼠便利超市（香雪店）</div>
+            <div class="store-info"><span class="store-state" style="color:#999">今日不生产</span><span class="store-pack">-</span></div>
+            
+        </div><div class="store-card" style="border-left:3px solid #999;background:#fafafa">
+            <div class="store-name">松鼠便利超市（知识城店）</div>
+            <div class="store-info"><span class="store-state" style="color:#999">今日不生产</span><span class="store-pack">-</span></div>
+            
+        </div><div class="store-card" style="border-left:3px solid #999;background:#fafafa">
+            <div class="store-name">松鼠便利超市（大沙东店）</div>
+            <div class="store-info"><span class="store-state" style="color:#999">今日不生产</span><span class="store-pack">-</span></div>
+            
+        </div><div class="store-card" style="border-left:3px solid #999;background:#fafafa">
+            <div class="store-name">松鼠便利超市（科学城店）</div>
+            <div class="store-info"><span class="store-state" style="color:#999">今日不生产</span><span class="store-pack">-</span></div>
+            
+        </div><div class="store-card" style="border-left:3px solid #999;background:#fafafa">
+            <div class="store-name">松鼠便利超市（黄埔萝岗店）</div>
+            <div class="store-info"><span class="store-state" style="color:#999">今日不生产</span><span class="store-pack">-</span></div>
+            
+        </div><div class="store-card" style="border-left:3px solid #999;background:#fafafa">
+            <div class="store-name">松鼠便利超市（高要南岸店）</div>
+            <div class="store-info"><span class="store-state" style="color:#999">今日不生产</span><span class="store-pack">-</span></div>
+            
+        </div></div></div>
+    </div>
+
+    <div class="footer">RDC PICKING COCKPIT · 广州白云仓 · 松鼠便利共享中心仓 · 2026-08-26 14:38:53</div>
+</div>
+
+</body>
+</html>
