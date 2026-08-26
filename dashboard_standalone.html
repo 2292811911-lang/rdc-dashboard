@@ -56352,7 +56352,9 @@ function processData() {
   areas.forEach(a => { areaSel.innerHTML += `<option value="${a}">${a}</option>`; });
   
   // 加载波次映射并渲染门店进度
-  // 波次映射已内嵌（由 build_standalone.ps1 生成）\r\n  allData.storeWaveMap = EMBEDDED_WAVE_MAP || {};\r\n  renderStoreProgress();
+  // 波次映射已内嵌（由 build_standalone.ps1 生成）
+  allData.storeWaveMap = EMBEDDED_WAVE_MAP || {};
+  renderStoreProgress();
 }
 
 // 门店进度渲染
