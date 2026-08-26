@@ -56028,6 +56028,8 @@ const EMBEDDED_DATA = {
   "total_tasks": 3107,
   "date_range": "2026-08-01 ~ 2026-08-26"
 }
+
+
 ;
 
 // 加载数据
@@ -56036,7 +56038,7 @@ async function loadData() {
     allData = EMBEDDED_DATA;
     processData();
     document.getElementById('subtitle').textContent =
-      数据范围: ${allData.date_range} | 导出时间: ${allData.export_time} (内嵌数据);
+      `数据范围: ${allData.date_range} | 导出时间: ${allData.export_time} (内嵌数据)`;
   } catch (e) {
     console.error('加载数据失败:', e);
     document.getElementById('subtitle').textContent = '数据加载失败';
