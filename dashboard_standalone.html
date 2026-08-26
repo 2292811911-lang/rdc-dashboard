@@ -56076,7 +56076,12 @@ function processData() {
   document.getElementById('stat-completion').textContent = completionRate;
   
   // ========== 当天数据计算 ==========
-  const todayStr = '2026-08-26';
+  // 从数据中提取最新日期（处理时区问题：时间戳是UTC+8，用UTC方法解析）
+  const allDoneTimes = tasks.map(t => t.doneTime).filter(Boolean);
+  const maxTime = Math.max(...allDoneTimes);
+  const maxDate = new Date(maxTime);
+  const todayStr = maxDate.getFullYear() + '-' + String(maxDate.getMonth()+1).padStart(2,'0') + '-' + String(maxDate.getDate()).padStart(2,'0');
+  
   const todayTasks = tasks.filter(t => {
     if (!t.doneTime) return false;
     const d = new Date(t.doneTime);
